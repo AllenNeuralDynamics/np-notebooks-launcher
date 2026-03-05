@@ -1,0 +1,6 @@
+- notebook cells have are given a special comment `# ///` followed by special syntax for specifying how the cell will be used.
+- first use case is to exclude or include for a subset of experiment types, e.g. when experiment is not ephys: hide. or when experiment is ephys: show. should also be able to support multiple experiment types simultanteously, e.g. when experiment is not ephys or behavior: hide. Need to devise good syntax, fairly short and intuitive, for specifying this
+- by default, with no comment, cells are displayed for all experiment types.
+- there may be further different uses in future, so we want to allow for some flexibility. for example, only show if user == X. 
+- we then take an ipynb file json and parse it for the comments, with an input like 'experiment_type' and then we can generate a new ipynb file with only the cells that match the criteria. This allows us to maintain a single notebook for all experiment types, while generating specific versions for each type as needed.
+- we need a launcher gui that allows users to select the experiment type and then generates and launches the appropriate notebook version for them to work with. 
