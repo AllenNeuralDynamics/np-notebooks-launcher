@@ -9,6 +9,12 @@ authors = [
 requires-python = ">=3.14"
 dependencies = []
 
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[project.scripts]
+launch = "np_notebooks_launcher:main"
+
 [build-system]
 requires = ["uv_build>=0.10.7,<0.11.0"]
 build-backend = "uv_build"

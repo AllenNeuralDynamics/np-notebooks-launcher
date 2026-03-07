@@ -1,0 +1,5 @@
+- strip special comments from cells that are shown in final notebook 
+- remove if statements
+- make CI/CD test on notebooks with comments, check the syntax
+- add python code cell at start containing ipywidget dropdown for experiment variable (e.g., `experiment_name = "pretest"`) in case someone runs from the original notebook without the launcher. the launcher just sets the default variable and disables selection or removes the other options, since the notebook has already been modified for the experiment type! the launcher gui can also extract the options to display from this dropdown
+- need to add reset/update commands to the launcher GUI, like reset_update_launch.bat, and make it deployable as a standalone executable, use uvx to run from pypi or github so it's always up-to-date
