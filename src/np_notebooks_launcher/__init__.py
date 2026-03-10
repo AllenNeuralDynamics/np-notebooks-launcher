@@ -497,16 +497,8 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
             ),
         )
 
-    btn_frame = tk.Frame(root)
-    btn_frame.pack(pady=16)
-    tk.Button(btn_frame, text="Launch", command=_launch, width=16).pack(
-        side="left", padx=4
-    )
-    tk.Button(btn_frame, text="Reset & Update", command=_reset_update, width=16).pack(
-        side="left", padx=4
-    )
+    tk.Button(root, text="Launch", command=_launch, width=16).pack(pady=16)
     root.bind("<Return>", lambda _: _launch())
-    root.after(0, _reset_update)
     root.mainloop()
 
 
