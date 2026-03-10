@@ -28,12 +28,14 @@ from __future__ import annotations
 
 import ast
 import copy
+import dataclasses
 import json
 import pathlib
 import re
 import subprocess
 import sys
 import tkinter as tk
+from tkinter import messagebox, ttk
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -159,10 +161,159 @@ def cell_is_visible(cell: dict[str, Any], ctx: ExperimentContext) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def filter_notebook(nb: dict[str, Any], ctx: ExperimentContext) -> dict[str, Any]:
-    """Return a deep-copy of *nb* with cells filtered according to *ctx*."""
+
+def _strip_directive(cell: dict[str, Any]) -> dict[str, Any]:
+    """Remove the directive comment from *cell*.
+
+    Assumes *cell* is already a writable copy. Returns *cell* for chaining.
+
+    Markdown cells only have the directive line removed.
+    """
+    if parse_cell_directive(cell) is None:
+        return cell
+
+    source = cell.get("source", [])
+    is_list = isinstance(source, list)
+    text = "".join(source) if is_list else source
+    lines = text.splitlines(keepends=True)
+    if not lines:
+        return cell
+
+    # Remove directive comment (first line)
+    lines = lines[1:]
+    new_text = "".join(lines)
+    cell["source"] = new_text.splitlines(keepends=True) if is_list else new_text
+    return cell
+
+
+# ---------------------------------------------------------------------------
+# First-cell variable parsing
+# ---------------------------------------------------------------------------
+
+_OptionValue = str | bool | int | float
+
+
+@dataclasses.dataclass
+class CellVariable:
+    """A variable declared with a ``Literal`` type annotation in a notebook cell."""
+
+    name: str
+    options: tuple[_OptionValue, ...]
+    default: _OptionValue
+
+
+def parse_first_cell_variables(cell: dict[str, Any]) -> list[CellVariable]:
+    """Extract ``Literal``-annotated variables from *cell*'s source code.
+
+    Each ``name: Literal[opt1, opt2, ...] = default`` line becomes a
+    :class:`CellVariable`.  Only variables whose name starts with ``_`` are
+    included (matching the notebook convention for launcher-injectable vars).
+    """
+    source = cell.get("source", [])
+    text = "".join(source) if isinstance(source, list) else source
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+
+    results: list[CellVariable] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.AnnAssign):
+            continue
+        target = node.target
+        if not isinstance(target, ast.Name) or not target.id.startswith("_"):
+            continue
+        ann = node.annotation
+        if not (
+            isinstance(ann, ast.Subscript)
+            and isinstance(ann.value, ast.Name)
+            and ann.value.id == "Literal"
+        ):
+            continue
+        # Extract options from the Literal slice
+        slice_node = ann.slice
+        if isinstance(slice_node, ast.Tuple):
+            elts = slice_node.elts
+        else:
+            elts = [slice_node]
+        options = tuple(
+            e.value for e in elts if isinstance(e, ast.Constant)
+        )
+        if not options:
+            continue
+        # Extract default
+        if node.value is None or not isinstance(node.value, ast.Constant):
+            continue
+        results.append(CellVariable(
+            name=target.id,
+            options=tuple(v for v in options if isinstance(v, (str, bool, int, float))),
+            default=node.value.value if isinstance(node.value.value, (str, bool, int, float)) else str(node.value.value),
+        ))
+    return results
+
+
+_LITERAL_LINE_RE = re.compile(r"^(\s*_\w+)\s*:.*Literal\[.*\]\s*=.*$")
+
+
+def _modify_first_cell(
+    nb: dict[str, Any],
+    selections: dict[str, _OptionValue],
+) -> None:
+    """Replace cell 0 of *nb* in-place with a markdown table showing injected values."""
+    if not nb["cells"]:
+        return
+    rows = "\n".join(
+        f"| `{var}` | `{repr(val)}` |" for var, val in selections.items()
+    )
+    source = (
+        "*This notebook was modified by the launcher according to the following config:*\n\n"
+        "| Variable | Value |\n"
+        "|---|---|\n"
+        f"{rows}"
+    )
+    cell = nb["cells"][0]
+    cell["cell_type"] = "markdown"
+    cell.pop("execution_count", None)
+    cell.pop("outputs", None)
+    cell["source"] = source
+
+
+def build_context_from_selections(
+    variables: list[CellVariable],
+    selections: dict[str, _OptionValue],
+) -> ExperimentContext:
+    """Build an :class:`ExperimentContext` from user-selected variable values.
+
+    For each string-valued :class:`CellVariable`, every option becomes a key
+    in the context; the key is ``True`` only for the selected option.
+
+    Example: ``_experiment`` with options ``("pretest", "ephys", "hab")`` and
+    selected value ``"hab"`` produces
+    ``{"pretest": False, "ephys": False, "hab": True}``.
+    """
+    ctx: ExperimentContext = {}
+    for var in variables:
+        selected = selections.get(var.name)
+        for opt in var.options:
+            if isinstance(opt, str):
+                ctx[opt] = opt == selected
+    return ctx
+
+
+def filter_notebook(
+    nb: dict[str, Any],
+    ctx: ExperimentContext,
+    variable_selections: dict[str, _OptionValue] | None = None,
+) -> dict[str, Any]:
+    """Return a deep-copy of *nb* with cells filtered and cleaned according to *ctx*."""
     nb = copy.deepcopy(nb)
-    nb["cells"] = [c for c in nb["cells"] if cell_is_visible(c, ctx)]
+    nb["cells"] = [
+        _strip_directive(c)
+        for c in nb["cells"]
+        if cell_is_visible(c, ctx)
+    ]
+    if variable_selections is not None:
+        _modify_first_cell(nb, variable_selections)
     return nb
 
 
@@ -178,13 +329,21 @@ def generate_filtered_notebook(
     source: str | pathlib.Path,
     ctx: ExperimentContext,
     output: str | pathlib.Path | None = None,
+    variable_selections: dict[str, _OptionValue] | None = None,
+    overwrite: bool = False,
 ) -> pathlib.Path:
-    """Write a filtered copy of *source* and return its path."""
+    """Write a filtered copy of *source* and return its path.
+
+    If *overwrite* is ``True`` the result is written back to *source* and
+    *output* is ignored.
+    """
     source = pathlib.Path(source)
     nb = load_notebook(source)
-    filtered = filter_notebook(nb, ctx)
-    if output is None:
-        tag = "_".join(k for k, v in ctx.items() if v) or "default"
+    filtered = filter_notebook(nb, ctx, variable_selections=variable_selections)
+    if overwrite:
+        output = source
+    elif output is None:
+        tag = "_".join(k for k, v in ctx.items() if v) or "modified"
         output = source.with_stem(f"{source.stem}_{tag}")
     output = pathlib.Path(output)
     save_notebook(filtered, output)
@@ -194,59 +353,6 @@ def generate_filtered_notebook(
 # ---------------------------------------------------------------------------
 # Launcher GUI
 # ---------------------------------------------------------------------------
-
-# Predefined experiment-type presets.
-# Keys match the boolean alias names used in dynamic_routing.ipynb cell 24.
-EXPERIMENT_PRESETS: dict[str, ExperimentContext] = {
-    "Ephys": {
-        "ephys": True,
-        "hab": False,
-        "hab_day_1": False,
-        "opto": False,
-        "optotagging": False,
-        "pretest": False,
-    },
-    "Ephys + Opto": {
-        "ephys": True,
-        "hab": False,
-        "hab_day_1": False,
-        "opto": True,
-        "optotagging": True,
-        "pretest": False,
-    },
-    "Hab": {
-        "ephys": False,
-        "hab": True,
-        "hab_day_1": False,
-        "opto": False,
-        "optotagging": False,
-        "pretest": False,
-    },
-    "Hab - day 1": {
-        "ephys": False,
-        "hab": True,
-        "hab_day_1": True,
-        "opto": False,
-        "optotagging": False,
-        "pretest": False,
-    },
-    "Pretest": {
-        "ephys": True,
-        "hab": False,
-        "hab_day_1": False,
-        "opto": False,
-        "optotagging": False,
-        "pretest": True,
-    },
-    "Behavior only": {
-        "ephys": False,
-        "hab": False,
-        "hab_day_1": False,
-        "opto": False,
-        "optotagging": False,
-        "pretest": False,
-    },
-}
 
 
 def launch_notebook(path: str | pathlib.Path) -> None:
@@ -258,30 +364,127 @@ def launch_notebook(path: str | pathlib.Path) -> None:
 
 
 def run_launcher(notebook_path: str | pathlib.Path) -> None:
-    """Open a GUI to select experiment type, then generate and launch a filtered notebook."""
+    """Open a GUI to select variable values, then generate and launch a filtered notebook."""
     notebook_path = pathlib.Path(notebook_path)
+    nb = load_notebook(notebook_path)
+    variables = parse_first_cell_variables(nb["cells"][0]) if nb["cells"] else []
 
     root = tk.Tk()
     root.title("Notebook Launcher")
     root.resizable(False, False)
 
-    tk.Label(root, text="Select experiment type:", font=("TkDefaultFont", 11)).pack(
-        padx=20, pady=(16, 4)
-    )
+    # Build a dropdown (Combobox) for each Literal-typed variable in cell 0.
+    # Map display strings back to typed values for each variable.
+    tk_vars: dict[str, tk.StringVar] = {}
+    option_maps: dict[str, dict[str, _OptionValue]] = {}
 
-    selected = tk.StringVar(value=next(iter(EXPERIMENT_PRESETS)))
-    for name in EXPERIMENT_PRESETS:
-        tk.Radiobutton(
-            root, text=name, variable=selected, value=name, anchor="w"
-        ).pack(fill="x", padx=32)
+    if variables:
+        tk.Label(
+            root, text="Select options:", font=("TkDefaultFont", 11),
+        ).pack(padx=20, pady=(16, 4))
+
+        for var in variables:
+            frame = tk.Frame(root)
+            frame.pack(fill="x", padx=20, pady=2)
+            tk.Label(frame, text=f"{var.name}:").pack(side="left", padx=(12, 4))
+
+            display_to_value = {str(opt): opt for opt in var.options}
+            option_maps[var.name] = display_to_value
+            display_options = list(display_to_value.keys())
+
+            sv = tk.StringVar(value=str(var.default))
+            tk_vars[var.name] = sv
+
+            combo = ttk.Combobox(
+                frame, textvariable=sv, values=display_options, state="readonly",
+            )
+            combo.pack(side="left", fill="x", expand=True, padx=4)
+    else:
+        tk.Label(
+            root, text="No configurable variables found.", font=("TkDefaultFont", 11),
+        ).pack(padx=20, pady=(16, 4))
+
+    overwrite_var = tk.BooleanVar(value=True)
+
+    def _on_overwrite_toggle(*_: object) -> None:
+        suffix_entry.config(state="disabled" if overwrite_var.get() else "normal")
+
+    overwrite_check = tk.Checkbutton(
+        root, text="Overwrite original file", variable=overwrite_var,
+        command=_on_overwrite_toggle,
+    )
+    overwrite_check.pack(pady=(0, 4))
+
+    suffix_frame = tk.Frame(root)
+    suffix_frame.pack(fill="x", padx=20, pady=(0, 4))
+    tk.Label(suffix_frame, text="Custom path:").pack(side="left", padx=(0, 4))
+    suffix_var = tk.StringVar()
+    suffix_entry = tk.Entry(suffix_frame, textvariable=suffix_var, state="disabled")
+    suffix_entry.pack(side="left", fill="x", expand=True)
+
+    def _update_suffix(*_: object) -> None:
+        suffix_var.set("_".join(sv.get() for sv in tk_vars.values()))
+
+    for sv in tk_vars.values():
+        sv.trace_add("write", _update_suffix)
+    _update_suffix()
 
     def _launch() -> None:
-        ctx = EXPERIMENT_PRESETS[selected.get()].copy()
-        out = generate_filtered_notebook(notebook_path, ctx)
+        selections: dict[str, _OptionValue] = {}
+        for name, sv in tk_vars.items():
+            display_val = sv.get()
+            selections[name] = option_maps[name][display_val]
+        overwrite = overwrite_var.get()
+        suffix = suffix_var.get().strip()
+        output: pathlib.Path | None = None
+        if not overwrite and suffix:
+            output = notebook_path.with_stem(f"{notebook_path.stem}_{suffix.removeprefix('_')}")
+        ctx = build_context_from_selections(variables, selections)
+        out = generate_filtered_notebook(
+            notebook_path, ctx, output=output,
+            variable_selections=selections or None,
+            overwrite=overwrite,
+        )
         launch_notebook(out)
         root.destroy()
 
-    tk.Button(root, text="Launch", command=_launch, width=16).pack(pady=16)
+    def _reset_update() -> None:
+        bat = notebook_path.parent.parent / "reset_update_launch.bat"
+        if not bat.exists():
+            messagebox.showerror("Not found", f"Reset script not found:\n{bat}")
+            return
+        if not messagebox.askyesno(
+            "Reset & Update",
+            "This will reset the repository to origin/main and update the Python "
+            "environment.\n\nContinue?",
+        ):
+            return
+        repo_path = "c:\\users\\svc_neuropix\\documents\\github\\np_notebooks"
+        p = subprocess.Popen(
+            ["git", "reset", "--hard", "origin/main"],
+            cwd=repo_path,
+            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
+        )
+        p.wait()
+        p = subprocess.Popen(
+            ["git", "pull", "origin", "main"],
+            cwd=repo_path,
+            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
+        )
+        p.wait()
+        p = subprocess.Popen(
+            ["uv", "sync", "--python", "3.11"],
+            cwd=repo_path,
+            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
+        )
+        p.wait()
+        root.destroy()
+
+    btn_frame = tk.Frame(root)
+    btn_frame.pack(pady=16)
+    tk.Button(btn_frame, text="Launch", command=_launch, width=16).pack(side="left", padx=4)
+    tk.Button(btn_frame, text="Reset & Update", command=_reset_update, width=16).pack(side="left", padx=4)
+    root.bind("<Return>", lambda _: _launch())
     root.mainloop()
 
 
@@ -294,7 +497,6 @@ def main() -> None:
     )
     parser.add_argument(
         "notebook",
-        nargs="?",
         help="Path to the source .ipynb file (default: notebooks/dynamic_routing.ipynb "
         "relative to the package install location).",
     )

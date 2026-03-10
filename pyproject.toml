@@ -1,20 +1,146 @@
 [project]
 name = "np-notebooks-launcher"
 version = "0.1.0"
-description = "Add your description here"
+description = "A tool to launch JupyterLab with a modified version of a notebook, based on user-specified parameters."
 readme = "README.md"
 authors = [
     { name = "bjhardcastle", email = "ben.hardcastle@alleninstitute.org" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = []
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+]
 
-[dependency-groups]
-dev = ["pytest>=8"]
+[project.license]
+text = "MIT"
+
+[project.urls]
+Repository = "https://github.com/AllenNeuralDynamics/np_notebooks_launcher"
+Issues = "https://github.com/AllenNeuralDynamics/np_notebooks_launcher/issues"
 
 [project.scripts]
+np-notebooks-launcher = "np_notebooks_launcher:main"
 launch = "np_notebooks_launcher:main"
+task = "poethepoet:main"
 
 [build-system]
 requires = ["uv_build>=0.10.7,<0.11.0"]
 build-backend = "uv_build"
+
+[dependency-groups]
+task_runner = ["poethepoet>=0.33.1"]
+testing = [
+    "pytest>=8.0",
+    "ruff>=0.8",
+    "ty>=0.0.19",
+    "pytest-cov>=4.1.0",
+]
+linting = ["black>=25.1.0", "isort>=6.0.1", "ruff>=0.11.2"]
+bump = ["bump-my-version>=1.1.1", "git-changelog>=2.5.3"]
+
+[tool.uv]
+package = true
+default-groups = "all"
+
+[tool.ruff]
+fix = true
+line-length = 100
+ignore-init-module-imports = true
+select = ["ANN", "B", "C", "E", "F", "I", "RUF100", "N", "UP", "W", "YTT"]
+extend-exclude = ["tests"]
+src = ["src", "tests"]
+
+[tool.ruff.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.black]
+target-version = ["py311"]
+
+[tool.coverage.paths]
+source = ["src"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = ["notebooks/*"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
+skip_empty = true
+exclude_also = [
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "@(abc.)?abstractmethod",
+    "@typing.runtime_checkable",
+]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--import-mode=importlib",
+    "--doctest-modules",
+    "--ignore-glob=*scripts*,*examples*",
+    "--cov",
+    "--cov-report=xml",
+    "--cov-config=pyproject.toml",
+    "--doctest-glob=*README.md",
+    "-x",
+]
+doctest_optionflags = [
+    "NORMALIZE_WHITESPACE",
+    "IGNORE_EXCEPTION_DETAIL",
+    "ELLIPSIS",
+]
+testpaths = ["src", "tests"]
+
+[tool.mypy]
+check_untyped_defs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_decorators = false
+disallow_any_unimported = false
+warn_return_any = false
+warn_unused_ignores = true
+no_implicit_optional = true
+show_error_codes = true
+ignore_missing_imports = true
+implicit_reexport = false
+exclude = ["src/npc_sessions/plots", "src/npc_sessions/scripts"]
+
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.rules]
+unresolved-import = "ignore"
+
+[tool.bumpversion]
+tag = true
+allow_dirty = true
+commit = true
+commit_args = "-a"
+message = "Bump version: {current_version} → {new_version} [skip actions]"
+pre_commit_hooks = [
+    "uv lock --upgrade-package domesday",
+    "git-changelog -o CHANGELOG.md",
+    "uv build",
+    "uv publish",
+]
+post_commit_hooks = ["git push origin main", "git push --tags"]
+
+[tool.poe.tasks]
+ty = "ty check"
+pytest = "pytest --cov-report term-missing:skip-covered --cov-report=html"
+test = ["pytest"]
+ruff = "ruff check src --fix-only"
+black = "black src"
+format = ["ruff", "black"]
+bump_pub_tag = "bump-my-version bump patch"
+release = ["format", "bump_pub_tag"]
