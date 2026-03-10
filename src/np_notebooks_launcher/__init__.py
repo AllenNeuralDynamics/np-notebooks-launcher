@@ -493,7 +493,7 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
         cmds = (
             "git fetch origin"
             " && git reset --hard origin/main"
-            " && git clean -fd" # remove untracked files and directories
+            " && git clean -fd"  # remove untracked files and directories
             " && uv sync --python 3.11"
         )
         subprocess.Popen(
