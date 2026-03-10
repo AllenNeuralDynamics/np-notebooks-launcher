@@ -357,10 +357,10 @@ def generate_filtered_notebook(
 
 
 def launch_notebook(path: str | pathlib.Path) -> None:
-    """Open *path* in JupyterLab (non-blocking)."""
+    """Open *path* within JupyterLab (non-blocking)."""
     subprocess.Popen(
-        [sys.executable, "-m", "jupyter", "lab", str(path)],
-        creationflags=subprocess.DETACHED_PROCESS if sys.platform == "win32" else 0,
+        ["C:\JupyterLab\JupyterLab.exe", str(path)],
+        creationflags=subprocess.DETACHED_PROCESS if sys.platform.startswith("win") else 0,
     )
 
 
