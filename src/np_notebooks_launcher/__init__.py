@@ -356,6 +356,15 @@ def generate_filtered_notebook(
 # ---------------------------------------------------------------------------
 
 
+def kill_jupyter_processes() -> None:
+    """Terminate any running JupyterLab and Python processes."""
+    for exe in ("JupyterLab.exe", "python.exe"):
+        subprocess.run(
+            ["taskkill", "/f", "/im", exe],
+            capture_output=True,
+        )
+
+
 def launch_notebook(path: str | pathlib.Path) -> None:
     """Open *path* within JupyterLab (non-blocking)."""
     subprocess.Popen(
@@ -507,6 +516,8 @@ def main() -> None:
     print(
         f"np-notebooks-launcher {importlib.metadata.version('np-notebooks-launcher')}"
     )
+
+    kill_jupyter_processes()
 
     parser = argparse.ArgumentParser(
         description="Select an experiment type and launch a filtered Jupyter notebook."
