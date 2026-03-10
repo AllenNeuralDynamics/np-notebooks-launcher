@@ -360,7 +360,9 @@ def launch_notebook(path: str | pathlib.Path) -> None:
     """Open *path* within JupyterLab (non-blocking)."""
     subprocess.Popen(
         [r"C:\JupyterLab\JupyterLab.exe", str(path)],
-        creationflags=subprocess.DETACHED_PROCESS if sys.platform.startswith("win") else 0,
+        creationflags=(
+            subprocess.DETACHED_PROCESS if sys.platform.startswith("win") else 0
+        ),
     )
 
 
