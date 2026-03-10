@@ -32,6 +32,7 @@ import copy
 import dataclasses
 import importlib.metadata
 import json
+import os
 import pathlib
 import re
 import subprocess
@@ -358,11 +359,11 @@ def generate_filtered_notebook(
 
 def kill_jupyter_processes() -> None:
     """Terminate any running JupyterLab and Python processes."""
-    for exe in ("JupyterLab.exe", "python.exe"):
-        subprocess.run(
-            ["taskkill", "/f", "/im", exe],
-            capture_output=True,
-        )
+    subprocess.run(["taskkill", "/f", "/im", "JupyterLab.exe"], capture_output=True)
+    subprocess.run(
+        ["taskkill", "/f", "/im", "python.exe", "/fi", f"PID ne {os.getpid()}"],
+        capture_output=True,
+    )
 
 
 def launch_notebook(path: str | pathlib.Path) -> None:
