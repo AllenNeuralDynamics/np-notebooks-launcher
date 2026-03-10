@@ -466,21 +466,17 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
 
     def _reset_update() -> None:
         repo_path = "c:/users/svc_neuropix/documents/github/np_notebooks"
-        has_changes = (
+        has_changes = subprocess.run(
+            ["git", "diff-index", "--quiet", "HEAD"],
+            cwd=repo_path,
+            capture_output=True,
+        ).returncode != 0 or bool(
             subprocess.run(
-                ["git", "diff-index", "--quiet", "HEAD"],
+                ["git", "ls-files", "--others", "--exclude-standard"],
                 cwd=repo_path,
                 capture_output=True,
-            ).returncode
-            != 0
-            or bool(
-                subprocess.run(
-                    ["git", "ls-files", "--others", "--exclude-standard"],
-                    cwd=repo_path,
-                    capture_output=True,
-                    text=True,
-                ).stdout.strip()
-            )
+                text=True,
+            ).stdout.strip()
         )
         if has_changes and not messagebox.askyesno(
             "Reset & Update",
