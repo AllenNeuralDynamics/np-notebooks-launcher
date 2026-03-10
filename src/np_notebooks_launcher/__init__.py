@@ -360,16 +360,6 @@ def generate_filtered_notebook(
 def kill_jupyter_processes() -> None:
     """Terminate any running JupyterLab and Python processes."""
     subprocess.run(["taskkill", "/f", "/im", "JupyterLab.exe"], capture_output=True)
-    current_pid = os.getpid()
-    result = subprocess.run(
-        ["wmic", "process", "where", "name='python.exe'", "get", "processid"],
-        capture_output=True,
-        text=True,
-    )
-    for line in result.stdout.splitlines():
-        pid_str = line.strip()
-        if pid_str.isdigit() and int(pid_str) != current_pid:
-            subprocess.run(["taskkill", "/f", "/pid", pid_str], capture_output=True)
 
 
 def launch_notebook(path: str | pathlib.Path) -> None:
