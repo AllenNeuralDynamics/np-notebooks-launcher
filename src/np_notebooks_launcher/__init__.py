@@ -504,7 +504,9 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
 
 def main() -> None:
     """CLI entry point: ``np-notebooks-launcher [notebook_path]``."""
-    print(f"np-notebooks-launcher {importlib.metadata.version('np-notebooks-launcher')}")
+    print(
+        f"np-notebooks-launcher {importlib.metadata.version('np-notebooks-launcher')}"
+    )
 
     parser = argparse.ArgumentParser(
         description="Select an experiment type and launch a filtered Jupyter notebook."
