@@ -465,13 +465,9 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
         root.destroy()
 
     def _reset_update() -> None:
-        bat = notebook_path.parent.parent / "reset_update_launch.bat"
-        if not bat.exists():
-            messagebox.showerror("Not found", f"Reset script not found:\n{bat}")
-            return
         if not messagebox.askyesno(
             "Reset & Update",
-            "This will reset the repository to origin/main and update the Python "
+            "This will reset the np_notebooks to origin/main and update the Python "
             "environment.\n\nContinue?",
         ):
             return
@@ -480,17 +476,14 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
             "git fetch origin"
             " && git reset --hard origin/main"
             " && uv sync --python 3.11"
-            " && pause"
         )
-        p = subprocess.Popen(
+        subprocess.Popen(
             ["cmd", "/c", cmds],
             cwd=repo_path,
             creationflags=(
                 subprocess.CREATE_NEW_CONSOLE if sys.platform.startswith("win") else 0
             ),
         )
-        p.wait()
-        root.destroy()
 
     btn_frame = tk.Frame(root)
     btn_frame.pack(pady=16)
@@ -501,6 +494,7 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
         side="left", padx=4
     )
     root.bind("<Return>", lambda _: _launch())
+    root.after(0, _reset_update)
     root.mainloop()
 
 
@@ -515,8 +509,7 @@ def main() -> None:
     )
     parser.add_argument(
         "path",
-        help="Path to the source .ipynb file (default: notebooks/dynamic_routing.ipynb "
-        "relative to the package install location).",
+        help="Path to the source .ipynb file.",
     )
     args = parser.parse_args()
 
