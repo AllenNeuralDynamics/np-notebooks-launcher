@@ -67,11 +67,11 @@ def parse_cell_directive(cell: dict[str, Any]) -> tuple[str, str] | None:
     if cell_type == "code":
         if not line.startswith(_CODE_PREFIX):
             return None
-        rest = line[len(_CODE_PREFIX):].strip()
+        rest = line[len(_CODE_PREFIX) :].strip()
     elif cell_type == "markdown":
         if not line.startswith(_MD_PREFIX):
             return None
-        rest = line[len(_MD_PREFIX):]
+        rest = line[len(_MD_PREFIX) :]
         if rest.endswith(_MD_SUFFIX):
             rest = rest[: -len(_MD_SUFFIX)]
         rest = rest.strip()
@@ -161,7 +161,6 @@ def cell_is_visible(cell: dict[str, Any], ctx: ExperimentContext) -> bool:
 # ---------------------------------------------------------------------------
 
 
-
 def _strip_directive(cell: dict[str, Any]) -> dict[str, Any]:
     """Remove the directive comment from *cell*.
 
@@ -236,19 +235,25 @@ def parse_first_cell_variables(cell: dict[str, Any]) -> list[CellVariable]:
             elts = slice_node.elts
         else:
             elts = [slice_node]
-        options = tuple(
-            e.value for e in elts if isinstance(e, ast.Constant)
-        )
+        options = tuple(e.value for e in elts if isinstance(e, ast.Constant))
         if not options:
             continue
         # Extract default
         if node.value is None or not isinstance(node.value, ast.Constant):
             continue
-        results.append(CellVariable(
-            name=target.id,
-            options=tuple(v for v in options if isinstance(v, (str, bool, int, float))),
-            default=node.value.value if isinstance(node.value.value, (str, bool, int, float)) else str(node.value.value),
-        ))
+        results.append(
+            CellVariable(
+                name=target.id,
+                options=tuple(
+                    v for v in options if isinstance(v, (str, bool, int, float))
+                ),
+                default=(
+                    node.value.value
+                    if isinstance(node.value.value, (str, bool, int, float))
+                    else str(node.value.value)
+                ),
+            )
+        )
     return results
 
 
@@ -262,9 +267,7 @@ def _modify_first_cell(
     """Replace cell 0 of *nb* in-place with a markdown table showing injected values."""
     if not nb["cells"]:
         return
-    rows = "\n".join(
-        f"| `{var}` | `{repr(val)}` |" for var, val in selections.items()
-    )
+    rows = "\n".join(f"| `{var}` | `{repr(val)}` |" for var, val in selections.items())
     source = (
         "*This notebook was modified by the launcher according to the following config:*\n\n"
         "| Variable | Value |\n"
@@ -307,11 +310,7 @@ def filter_notebook(
 ) -> dict[str, Any]:
     """Return a deep-copy of *nb* with cells filtered and cleaned according to *ctx*."""
     nb = copy.deepcopy(nb)
-    nb["cells"] = [
-        _strip_directive(c)
-        for c in nb["cells"]
-        if cell_is_visible(c, ctx)
-    ]
+    nb["cells"] = [_strip_directive(c) for c in nb["cells"] if cell_is_visible(c, ctx)]
     if variable_selections is not None:
         _modify_first_cell(nb, variable_selections)
     return nb
@@ -380,7 +379,9 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
 
     if variables:
         tk.Label(
-            root, text="Select options:", font=("TkDefaultFont", 11),
+            root,
+            text="Select options:",
+            font=("TkDefaultFont", 11),
         ).pack(padx=20, pady=(16, 4))
 
         for var in variables:
@@ -396,12 +397,17 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
             tk_vars[var.name] = sv
 
             combo = ttk.Combobox(
-                frame, textvariable=sv, values=display_options, state="readonly",
+                frame,
+                textvariable=sv,
+                values=display_options,
+                state="readonly",
             )
             combo.pack(side="left", fill="x", expand=True, padx=4)
     else:
         tk.Label(
-            root, text="No configurable variables found.", font=("TkDefaultFont", 11),
+            root,
+            text="No configurable variables found.",
+            font=("TkDefaultFont", 11),
         ).pack(padx=20, pady=(16, 4))
 
     overwrite_var = tk.BooleanVar(value=True)
@@ -410,7 +416,9 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
         suffix_entry.config(state="disabled" if overwrite_var.get() else "normal")
 
     overwrite_check = tk.Checkbutton(
-        root, text="Overwrite original file", variable=overwrite_var,
+        root,
+        text="Overwrite original file",
+        variable=overwrite_var,
         command=_on_overwrite_toggle,
     )
     overwrite_check.pack(pady=(0, 4))
@@ -438,10 +446,14 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
         suffix = suffix_var.get().strip()
         output: pathlib.Path | None = None
         if not overwrite and suffix:
-            output = notebook_path.with_stem(f"{notebook_path.stem}_{suffix.removeprefix('_')}")
+            output = notebook_path.with_stem(
+                f"{notebook_path.stem}_{suffix.removeprefix('_')}"
+            )
         ctx = build_context_from_selections(variables, selections)
         out = generate_filtered_notebook(
-            notebook_path, ctx, output=output,
+            notebook_path,
+            ctx,
+            output=output,
             variable_selections=selections or None,
             overwrite=overwrite,
         )
@@ -463,27 +475,37 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
         p = subprocess.Popen(
             ["git", "reset", "--hard", "origin/main"],
             cwd=repo_path,
-            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
+            creationflags=(
+                subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
+            ),
         )
         p.wait()
         p = subprocess.Popen(
             ["git", "pull", "origin", "main"],
             cwd=repo_path,
-            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
+            creationflags=(
+                subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
+            ),
         )
         p.wait()
         p = subprocess.Popen(
             ["uv", "sync", "--python", "3.11"],
             cwd=repo_path,
-            creationflags=subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0,
+            creationflags=(
+                subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
+            ),
         )
         p.wait()
         root.destroy()
 
     btn_frame = tk.Frame(root)
     btn_frame.pack(pady=16)
-    tk.Button(btn_frame, text="Launch", command=_launch, width=16).pack(side="left", padx=4)
-    tk.Button(btn_frame, text="Reset & Update", command=_reset_update, width=16).pack(side="left", padx=4)
+    tk.Button(btn_frame, text="Launch", command=_launch, width=16).pack(
+        side="left", padx=4
+    )
+    tk.Button(btn_frame, text="Reset & Update", command=_reset_update, width=16).pack(
+        side="left", padx=4
+    )
     root.bind("<Return>", lambda _: _launch())
     root.mainloop()
 
@@ -505,7 +527,11 @@ def main() -> None:
     if args.notebook:
         notebook_path = pathlib.Path(args.notebook)
     else:
-        notebook_path = pathlib.Path(__file__).parent.parent.parent / "notebooks" / "dynamic_routing.ipynb"
+        notebook_path = (
+            pathlib.Path(__file__).parent.parent.parent
+            / "notebooks"
+            / "dynamic_routing.ipynb"
+        )
 
     if not notebook_path.exists():
         parser.error(f"Notebook not found: {notebook_path}")
