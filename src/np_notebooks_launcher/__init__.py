@@ -361,7 +361,7 @@ def kill_jupyter_processes() -> None:
     """Terminate any running JupyterLab and Python processes."""
     subprocess.run(["taskkill", "/f", "/im", "JupyterLab.exe"], capture_output=True)
     subprocess.run(
-        ["taskkill", "/f", "/im", "python.exe", "/fi", f"PID ne {os.getpid()}"],
+        ["taskkill", "/f", "/fi", f"PID ne {os.getpid()}", "/im", "python.exe"],
         capture_output=True,
     )
 
