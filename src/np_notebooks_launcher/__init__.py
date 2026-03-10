@@ -26,9 +26,11 @@ Example
 
 from __future__ import annotations
 
+import argparse
 import ast
 import copy
 import dataclasses
+import importlib.metadata
 import json
 import pathlib
 import re
@@ -502,20 +504,20 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
 
 def main() -> None:
     """CLI entry point: ``np-notebooks-launcher [notebook_path]``."""
-    import argparse
+    print(f"np-notebooks-launcher {importlib.metadata.version('np-notebooks-launcher')}")
 
     parser = argparse.ArgumentParser(
         description="Select an experiment type and launch a filtered Jupyter notebook."
     )
     parser.add_argument(
-        "notebook",
+        "path",
         help="Path to the source .ipynb file (default: notebooks/dynamic_routing.ipynb "
         "relative to the package install location).",
     )
     args = parser.parse_args()
 
-    if args.notebook:
-        notebook_path = pathlib.Path(args.notebook)
+    if args.path:
+        notebook_path = pathlib.Path(args.path)
     else:
         notebook_path = (
             pathlib.Path(__file__).parent.parent.parent
