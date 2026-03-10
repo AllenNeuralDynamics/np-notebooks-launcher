@@ -484,7 +484,7 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
             ["cmd", "/c", cmds],
             cwd=repo_path,
             creationflags=(
-                subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
+                subprocess.CREATE_NEW_CONSOLE if sys.platform.startswith("win") else 0
             ),
         )
         p.wait()
