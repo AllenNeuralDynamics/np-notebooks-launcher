@@ -518,14 +518,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    if args.path:
-        notebook_path = pathlib.Path(args.path)
-    else:
-        notebook_path = (
-            pathlib.Path(__file__).parent.parent.parent
-            / "notebooks"
-            / "dynamic_routing.ipynb"
-        )
+    notebook_path = pathlib.Path(args.path)
 
     if not notebook_path.exists():
         parser.error(f"Notebook not found: {notebook_path}")
