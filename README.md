@@ -14,15 +14,15 @@ A GUI tool for launching JupyterLab with a filtered, pre-configured version of a
 
 1. **Reads the first cell** of a notebook to find `_`-prefixed variables annotated as `Literal`, `int`, `float` or `bool` types — these are the configurable parameters:
 
-    ![alt text](docs/original.png)
+    ![alt text](https://raw.githubusercontent.com/AllenNeuralDynamics/np-notebooks-launcher/ec16288c3eae30819170b0be78a8d781704b104e/docs/original.png)
 
 2. **Shows a GUI** with a dropdown for each variable, pre-populated with the options and default from the notebook:
 
-    ![Preview of launcher GUI](docs/gui.png)
+    ![Preview of launcher GUI](https://raw.githubusercontent.com/AllenNeuralDynamics/np-notebooks-launcher/ec16288c3eae30819170b0be78a8d781704b104e/docs/gui.png)
 3. **Generates a filtered copy** of the notebook with the selected values injected and irrelevant cells removed.
 4. **Launches JupyterLab** with the filtered copy, with the first cell modified:
 
-    ![alt text](docs/modified.png)
+    ![alt text](https://raw.githubusercontent.com/AllenNeuralDynamics/np-notebooks-launcher/ec16288c3eae30819170b0be78a8d781704b104e/docs/modified.png)
 
 The launcher also has a **Reset & Update** button which is hard-coded to reset to the latest commit on `github.com/alleninstitute/np_notebooks:main` and runs `uv sync` on the repository.
 

@@ -22,8 +22,8 @@ classifiers = [
 text = "MIT"
 
 [project.urls]
-Repository = "https://github.com/AllenNeuralDynamics/np_notebooks_launcher"
-Issues = "https://github.com/AllenNeuralDynamics/np_notebooks_launcher/issues"
+Repository = "https://github.com/AllenNeuralDynamics/np-notebooks-launcher"
+Issues = "https://github.com/AllenNeuralDynamics/np-notebooks-launcher/issues"
 
 [project.scripts]
 np-notebooks-launcher = "np_notebooks_launcher:main"
