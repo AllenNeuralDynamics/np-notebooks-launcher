@@ -359,7 +359,7 @@ def generate_filtered_notebook(
 def launch_notebook(path: str | pathlib.Path) -> None:
     """Open *path* within JupyterLab (non-blocking)."""
     subprocess.Popen(
-        ["C:\JupyterLab\JupyterLab.exe", str(path)],
+        [r"C:\JupyterLab\JupyterLab.exe", str(path)],
         creationflags=subprocess.DETACHED_PROCESS if sys.platform.startswith("win") else 0,
     )
 
@@ -475,8 +475,8 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
             return
         repo_path = "c:/users/svc_neuropix/documents/github/np_notebooks"
         cmds = (
-            "git reset --hard origin/main"
-            " && git pull origin main"
+            "git fetch origin"
+            " && git reset --hard origin/main"
             " && uv sync --python 3.11"
             " && pause"
         )
