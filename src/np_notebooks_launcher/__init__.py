@@ -471,25 +471,15 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
             "environment.\n\nContinue?",
         ):
             return
-        repo_path = "c:\\users\\svc_neuropix\\documents\\github\\np_notebooks"
-        p = subprocess.Popen(
-            ["git", "reset", "--hard", "origin/main"],
-            cwd=repo_path,
-            creationflags=(
-                subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
-            ),
+        repo_path = "c:/users/svc_neuropix/documents/github/np_notebooks"
+        cmds = (
+            "git reset --hard origin/main"
+            " && git pull origin main"
+            " && uv sync --python 3.11"
+            " && pause"
         )
-        p.wait()
         p = subprocess.Popen(
-            ["git", "pull", "origin", "main"],
-            cwd=repo_path,
-            creationflags=(
-                subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
-            ),
-        )
-        p.wait()
-        p = subprocess.Popen(
-            ["uv", "sync", "--python", "3.11"],
+            ["cmd", "/c", cmds],
             cwd=repo_path,
             creationflags=(
                 subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
