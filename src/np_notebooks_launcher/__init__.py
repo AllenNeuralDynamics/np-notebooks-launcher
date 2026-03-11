@@ -494,6 +494,7 @@ def run_launcher(notebook_path: str | pathlib.Path, branch: str = "main") -> Non
                 text=True,
             ).stdout.strip()
         )
+        logger.info("Uncommitted changes: %s", has_changes)
         if has_changes and not messagebox.askyesno(
             "Reset & Update",
             f"This will reset the np_notebooks to origin/{branch} and update the Python "
