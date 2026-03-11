@@ -325,18 +325,17 @@ class TestParseFirstCellVariables:
 # ---------------------------------------------------------------------------
 
 class TestModifyFirstCell:
-    def test_replaces_cell_with_markdown_table(self):
+    def test_replaces_cell_with_code_assignments(self):
         nb = notebook(code_cell(
             '# variables in this cell can be injected by launcher:\n'
             '_experiment: Literal["pretest", "ephys"] = "pretest"\n'
         ))
         _modify_first_cell(nb, {"_experiment": "ephys"})
         cell = nb["cells"][0]
-        assert cell["cell_type"] == "markdown"
+        assert cell["cell_type"] == "code"
         src = cell["source"]
-        assert "modified by the launcher" in src
-        assert "_experiment" in src
-        assert "'ephys'" in src
+        assert "injected by the launcher" in src
+        assert "_experiment = 'ephys'" in src
 
     def test_preserves_bool_type(self):
         nb = notebook(code_cell(
@@ -358,25 +357,25 @@ class TestModifyFirstCell:
         assert "_count" in src
         assert "42" in src
 
-    def test_no_selections_produces_empty_table(self):
+    def test_no_selections_produces_comment_only(self):
         nb = notebook(code_cell(
             '# comment\n'
             '_experiment: Literal["a", "b"] = "a"\n'
         ))
         _modify_first_cell(nb, {})
         cell = nb["cells"][0]
-        assert cell["cell_type"] == "markdown"
-        assert "modified by the launcher" in cell["source"]
+        assert cell["cell_type"] == "code"
+        assert "injected by the launcher" in cell["source"]
 
-    def test_multiple_variables_in_table(self):
+    def test_multiple_variables_as_assignments(self):
         nb = notebook(code_cell(
             '_x: Literal["a"] = "a"\n'
             '_y: Literal[1, 2] = 1\n'
         ))
         _modify_first_cell(nb, {"_x": "a", "_y": 2})
         src = nb["cells"][0]["source"]
-        assert "_x" in src
-        assert "_y" in src
+        assert "_x = 'a'" in src
+        assert "_y = 2" in src
 
     def test_empty_notebook(self):
         nb = notebook()
@@ -634,8 +633,8 @@ class TestDynamicRoutingNotebook:
                 result = load_notebook(out)
                 assert result["cells"], f"No cells for {var.name}={opt}"
                 cell = result["cells"][0]
-                assert cell["cell_type"] == "markdown"
-                assert "modified by the launcher" in cell["source"]
+                assert cell["cell_type"] == "code"
+                assert "injected by the launcher" in cell["source"]
 
     def test_hab_injection_widget_visible(self):
         """Regression: show-if: _experiment=hab or (ephys and not pretest)."""

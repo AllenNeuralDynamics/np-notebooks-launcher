@@ -267,21 +267,19 @@ def _modify_first_cell(
     nb: dict[str, Any],
     selections: dict[str, _OptionValue],
 ) -> None:
-    """Replace cell 0 of *nb* in-place with a markdown table showing injected values."""
+    """Replace cell 0 of *nb* in-place with Python assignments for each injected value.
+
+    The cell must be run as-is before executing the rest of the notebook.
+    """
     if not nb["cells"]:
         return
-    rows = "\n".join(f"| `{var}` | `{repr(val)}` |" for var, val in selections.items())
-    source = (
-        "*This notebook was modified by the launcher according to the following config:*\n\n"
-        "| Variable | Value |\n"
-        "|---|---|\n"
-        f"{rows}"
-    )
+    lines = ["# This cell was injected by the launcher and must be run as-is."]
+    lines.extend(f"{var} = {repr(val)}" for var, val in selections.items())
     cell = nb["cells"][0]
-    cell["cell_type"] = "markdown"
-    cell.pop("execution_count", None)
-    cell.pop("outputs", None)
-    cell["source"] = source
+    cell["cell_type"] = "code"
+    cell["execution_count"] = None
+    cell["outputs"] = []
+    cell["source"] = "\n".join(lines)
 
 
 def build_context_from_selections(
