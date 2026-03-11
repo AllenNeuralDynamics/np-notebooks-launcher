@@ -32,6 +32,7 @@ import copy
 import dataclasses
 import importlib.metadata
 import json
+import logging
 import os
 import pathlib
 import re
@@ -40,6 +41,8 @@ import sys
 import tkinter as tk
 from tkinter import messagebox, ttk
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Directive parsing
@@ -370,7 +373,7 @@ def launch_notebook(path: str | pathlib.Path) -> None:
     )
 
 
-def run_launcher(notebook_path: str | pathlib.Path) -> None:
+def run_launcher(notebook_path: str | pathlib.Path, branch: str = "main") -> None:
     """Open a GUI to select variable values, then generate and launch a filtered notebook."""
     notebook_path = pathlib.Path(notebook_path)
     nb = load_notebook(notebook_path)
@@ -470,6 +473,7 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
 
     def _reset_update() -> None:
         repo_path = "c:/users/svc_neuropix/documents/github/np_notebooks"
+        logger.info("Checking for uncommitted changes in %s", repo_path)
         has_changes = subprocess.run(
             ["git", "diff-index", "--quiet", "HEAD"],
             cwd=repo_path,
@@ -484,13 +488,14 @@ def run_launcher(notebook_path: str | pathlib.Path) -> None:
         )
         if has_changes and not messagebox.askyesno(
             "Reset & Update",
-            "This will reset the np_notebooks to origin/main and update the Python "
+            f"This will reset the np_notebooks to origin/{branch} and update the Python "
             "environment.\n\nContinue?",
         ):
             return
+        logger.info("Resetting np_notebooks to origin/%s", branch)
         cmds = (
             "git fetch origin"
-            " && git reset --hard origin/main"
+            f" && git reset --hard origin/{branch}"
             " && git clean -fd"  # remove untracked files and directories
             " && uv sync --python 3.11"
         )
@@ -522,6 +527,11 @@ def main() -> None:
         "path",
         help="Path to the source .ipynb file.",
     )
+    parser.add_argument(
+        "--branch",
+        default="main",
+        help="Remote branch to reset np_notebooks to on update (default: main).",
+    )
     args = parser.parse_args()
 
     notebook_path = pathlib.Path(args.path)
@@ -529,4 +539,5 @@ def main() -> None:
     if not notebook_path.exists():
         parser.error(f"Notebook not found: {notebook_path}")
 
-    run_launcher(notebook_path)
+    logger.info("Launching notebook %s (branch=%s)", notebook_path, args.branch)
+    run_launcher(notebook_path, branch=args.branch)
