@@ -522,7 +522,9 @@ def run_launcher(notebook_path: str | pathlib.Path, branch: str = "main") -> Non
 
 def main() -> None:
     """CLI entry point: ``np-notebooks-launcher [notebook_path]``."""
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s"
+    )
     logger.info(
         f"np-notebooks-launcher {importlib.metadata.version('np-notebooks-launcher')}"
     )
