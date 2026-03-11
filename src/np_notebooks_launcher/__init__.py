@@ -501,6 +501,8 @@ def run_launcher(notebook_path: str | pathlib.Path, branch: str = "main") -> Non
             "environment.\n\nContinue?",
         ):
             return
+        logger.info("Terminating Jupyterlab processes to avoid file locks during reset")
+        kill_jupyter_processes() # so files aren't locked during reset
         logger.info("Resetting np_notebooks to origin/%s", branch)
         cmds = (
             "git fetch origin"
@@ -518,6 +520,7 @@ def run_launcher(notebook_path: str | pathlib.Path, branch: str = "main") -> Non
 
     tk.Button(root, text="Launch", command=_launch, width=16).pack(pady=16)
     root.bind("<Return>", lambda _: _launch())
+    root.after(0, _reset_update)
     root.mainloop()
 
 
@@ -529,9 +532,7 @@ def main() -> None:
     logger.info(
         f"np-notebooks-launcher {importlib.metadata.version('np-notebooks-launcher')}"
     )
-
-    kill_jupyter_processes()
-
+    
     parser = argparse.ArgumentParser(
         description="Select an experiment type and launch a filtered Jupyter notebook."
     )
