@@ -1,6 +1,6 @@
 [project]
 name = "np-notebooks-launcher"
-version = "0.1.15"
+version = "0.1.16"
 description = "A tool to launch JupyterLab with a modified version of a notebook, based on user-specified parameters."
 readme = "README.md"
 authors = [
