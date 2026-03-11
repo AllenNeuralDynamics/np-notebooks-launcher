@@ -503,7 +503,7 @@ def run_launcher(notebook_path: str | pathlib.Path, branch: str = "main") -> Non
         logger.info("Resetting np_notebooks to origin/%s", branch)
         cmds = (
             "git fetch origin"
-            f" && git reset --hard origin/{branch}"
+            f" && git checkout -fB {branch} origin/{branch}"
             " && git clean -fd"  # remove untracked files and directories
             " && uv sync --python 3.11"
         )
