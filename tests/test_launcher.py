@@ -632,7 +632,9 @@ class TestDynamicRoutingNotebook:
                 )
                 result = load_notebook(out)
                 assert result["cells"], f"No cells for {var.name}={opt}"
-                cell = result["cells"][0]
+                assert result["cells"][0]["cell_type"] == "markdown"
+                assert "modified by the launcher" in result["cells"][0]["source"]
+                cell = result["cells"][1]
                 assert cell["cell_type"] == "code"
                 assert "injected by the launcher" in cell["source"]
 

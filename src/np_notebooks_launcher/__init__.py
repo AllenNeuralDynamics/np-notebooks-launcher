@@ -307,6 +307,13 @@ def build_context_from_selections(
     return ctx
 
 
+def _make_launcher_summary_cell(selections: dict[str, _OptionValue]) -> dict[str, Any]:
+    """Return a markdown cell summarising the launcher's variable selections."""
+    lines = ["<!-- modified by the launcher -->"]
+    lines.extend(f"- `{var} = {repr(val)}`" for var, val in selections.items())
+    return {"cell_type": "markdown", "source": "\n".join(lines), "metadata": {}}
+
+
 def filter_notebook(
     nb: dict[str, Any],
     ctx: ExperimentContext,
@@ -317,6 +324,7 @@ def filter_notebook(
     nb["cells"] = [_strip_directive(c) for c in nb["cells"] if cell_is_visible(c, ctx)]
     if variable_selections is not None:
         _modify_first_cell(nb, variable_selections)
+        nb["cells"].insert(0, _make_launcher_summary_cell(variable_selections))
     return nb
 
 
