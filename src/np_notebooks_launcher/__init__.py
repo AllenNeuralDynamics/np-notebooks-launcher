@@ -39,7 +39,7 @@ import re
 import subprocess
 import sys
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import ttk
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -381,146 +381,179 @@ def launch_notebook(path: str | pathlib.Path) -> None:
     )
 
 
+def _reset_np_notebooks(branch: str) -> subprocess.Popen | None:
+    """Reset np_notebooks repo to origin/<branch> and sync the environment.
+
+    Returns the spawned Popen process, or None if reset was skipped.
+    """
+    from tkinter import messagebox
+
+    repo_path = "c:/users/svc_neuropix/documents/github/np_notebooks"
+    logger.info("Checking for uncommitted changes in %s", repo_path)
+    has_changes = subprocess.run(
+        ["git", "diff-index", "--quiet", "HEAD"],
+        cwd=repo_path,
+        capture_output=True,
+    ).returncode != 0 or bool(
+        subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"],
+            cwd=repo_path,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    )
+    logger.info("Uncommitted changes: %s", has_changes)
+    if has_changes and not messagebox.askyesno(
+        "Reset & Update",
+        f"This will reset the np_notebooks to origin/{branch} and update the Python "
+        "environment.\n\nContinue?",
+    ):
+        return None
+    logger.info("Terminating Jupyterlab processes to avoid file locks during reset")
+    kill_jupyter_processes()
+    logger.info("Resetting np_notebooks to origin/%s", branch)
+    cmds = (
+        "git fetch origin"
+        f" && git checkout -fB {branch} origin/{branch}"
+        " && git clean -fd"
+        " && uv sync --python 3.11"
+    )
+    return subprocess.Popen(
+        ["cmd", "/c", cmds],
+        cwd=repo_path,
+        creationflags=(
+            subprocess.CREATE_NEW_CONSOLE if sys.platform.startswith("win") else 0
+        ),
+    )
+
+
 def run_launcher(notebook_path: str | pathlib.Path, branch: str = "main") -> None:
     """Open a GUI to select variable values, then generate and launch a filtered notebook."""
     notebook_path = pathlib.Path(notebook_path)
-    nb = load_notebook(notebook_path)
-    variables = parse_first_cell_variables(nb["cells"][0]) if nb["cells"] else []
 
     root = tk.Tk()
     root.title("Notebook Launcher")
     root.resizable(False, False)
 
-    # Build a dropdown (Combobox) for each Literal-typed variable in cell 0.
-    # Map display strings back to typed values for each variable.
-    tk_vars: dict[str, tk.StringVar] = {}
-    option_maps: dict[str, dict[str, _OptionValue]] = {}
-
-    if variables:
-        tk.Label(
-            root,
-            text="Select options:",
-            font=("TkDefaultFont", 11),
-        ).pack(padx=20, pady=(16, 4))
-
-        for var in variables:
-            frame = tk.Frame(root)
-            frame.pack(fill="x", padx=20, pady=2)
-            tk.Label(frame, text=f"{var.name}:").pack(side="left", padx=(12, 4))
-
-            display_to_value = {str(opt): opt for opt in var.options}
-            option_maps[var.name] = display_to_value
-            display_options = list(display_to_value.keys())
-
-            sv = tk.StringVar(value=str(var.default))
-            tk_vars[var.name] = sv
-
-            combo = ttk.Combobox(
-                frame,
-                textvariable=sv,
-                values=display_options,
-                state="readonly",
-            )
-            combo.pack(side="left", fill="x", expand=True, padx=4)
-    else:
-        tk.Label(
-            root,
-            text="No configurable variables found.",
-            font=("TkDefaultFont", 11),
-        ).pack(padx=20, pady=(16, 4))
-
-    overwrite_var = tk.BooleanVar(value=True)
-
-    def _on_overwrite_toggle(*_: object) -> None:
-        suffix_entry.config(state="disabled" if overwrite_var.get() else "normal")
-
-    overwrite_check = tk.Checkbutton(
+    status_label = tk.Label(
         root,
-        text="Overwrite original file",
-        variable=overwrite_var,
-        command=_on_overwrite_toggle,
+        text="Resetting & updating np_notebooks...",
+        font=("TkDefaultFont", 11),
     )
-    overwrite_check.pack(pady=(0, 4))
+    status_label.pack(padx=20, pady=(16, 16))
 
-    suffix_frame = tk.Frame(root)
-    suffix_frame.pack(fill="x", padx=20, pady=(0, 4))
-    tk.Label(suffix_frame, text="Custom path:").pack(side="left", padx=(0, 4))
-    suffix_var = tk.StringVar()
-    suffix_entry = tk.Entry(suffix_frame, textvariable=suffix_var, state="disabled")
-    suffix_entry.pack(side="left", fill="x", expand=True)
+    def _build_widgets() -> None:
+        status_label.destroy()
+        nb = load_notebook(notebook_path)
+        variables = parse_first_cell_variables(nb["cells"][0]) if nb["cells"] else []
 
-    def _update_suffix(*_: object) -> None:
-        suffix_var.set("_".join(sv.get() for sv in tk_vars.values()))
+        # Build a dropdown (Combobox) for each Literal-typed variable in cell 0.
+        # Map display strings back to typed values for each variable.
+        tk_vars: dict[str, tk.StringVar] = {}
+        option_maps: dict[str, dict[str, _OptionValue]] = {}
 
-    for sv in tk_vars.values():
-        sv.trace_add("write", _update_suffix)
-    _update_suffix()
+        if variables:
+            tk.Label(
+                root,
+                text="Select options:",
+                font=("TkDefaultFont", 11),
+            ).pack(padx=20, pady=(16, 4))
 
-    def _launch() -> None:
-        selections: dict[str, _OptionValue] = {}
-        for name, sv in tk_vars.items():
-            display_val = sv.get()
-            selections[name] = option_maps[name][display_val]
-        overwrite = overwrite_var.get()
-        suffix = suffix_var.get().strip()
-        output: pathlib.Path | None = None
-        if not overwrite and suffix:
-            output = notebook_path.with_stem(
-                f"{notebook_path.stem}_{suffix.removeprefix('_')}"
+            for var in variables:
+                frame = tk.Frame(root)
+                frame.pack(fill="x", padx=20, pady=2)
+                tk.Label(frame, text=f"{var.name}:").pack(side="left", padx=(12, 4))
+
+                display_to_value = {str(opt): opt for opt in var.options}
+                option_maps[var.name] = display_to_value
+                display_options = list(display_to_value.keys())
+
+                sv = tk.StringVar(value=str(var.default))
+                tk_vars[var.name] = sv
+
+                combo = ttk.Combobox(
+                    frame,
+                    textvariable=sv,
+                    values=display_options,
+                    state="readonly",
+                )
+                combo.pack(side="left", fill="x", expand=True, padx=4)
+        else:
+            tk.Label(
+                root,
+                text="No configurable variables found.",
+                font=("TkDefaultFont", 11),
+            ).pack(padx=20, pady=(16, 4))
+
+        overwrite_var = tk.BooleanVar(value=True)
+
+        def _on_overwrite_toggle(*_: object) -> None:
+            suffix_entry.config(state="disabled" if overwrite_var.get() else "normal")
+
+        overwrite_check = tk.Checkbutton(
+            root,
+            text="Overwrite original file",
+            variable=overwrite_var,
+            command=_on_overwrite_toggle,
+        )
+        overwrite_check.pack(pady=(0, 4))
+
+        suffix_frame = tk.Frame(root)
+        suffix_frame.pack(fill="x", padx=20, pady=(0, 4))
+        tk.Label(suffix_frame, text="Custom path:").pack(side="left", padx=(0, 4))
+        suffix_var = tk.StringVar()
+        suffix_entry = tk.Entry(suffix_frame, textvariable=suffix_var, state="disabled")
+        suffix_entry.pack(side="left", fill="x", expand=True)
+
+        def _update_suffix(*_: object) -> None:
+            suffix_var.set("_".join(sv.get() for sv in tk_vars.values()))
+
+        for sv in tk_vars.values():
+            sv.trace_add("write", _update_suffix)
+        _update_suffix()
+
+        def _launch() -> None:
+            selections: dict[str, _OptionValue] = {}
+            for name, sv in tk_vars.items():
+                display_val = sv.get()
+                selections[name] = option_maps[name][display_val]
+            overwrite = overwrite_var.get()
+            suffix = suffix_var.get().strip()
+            output: pathlib.Path | None = None
+            if not overwrite and suffix:
+                output = notebook_path.with_stem(
+                    f"{notebook_path.stem}_{suffix.removeprefix('_')}"
+                )
+            ctx = build_context_from_selections(variables, selections)
+            out = generate_filtered_notebook(
+                notebook_path,
+                ctx,
+                output=output,
+                variable_selections=selections or None,
+                overwrite=overwrite,
             )
-        ctx = build_context_from_selections(variables, selections)
-        out = generate_filtered_notebook(
-            notebook_path,
-            ctx,
-            output=output,
-            variable_selections=selections or None,
-            overwrite=overwrite,
-        )
-        launch_notebook(out)
-        root.destroy()
+            launch_notebook(out)
+            root.destroy()
 
-    def _reset_update() -> None:
-        repo_path = "c:/users/svc_neuropix/documents/github/np_notebooks"
-        logger.info("Checking for uncommitted changes in %s", repo_path)
-        has_changes = subprocess.run(
-            ["git", "diff-index", "--quiet", "HEAD"],
-            cwd=repo_path,
-            capture_output=True,
-        ).returncode != 0 or bool(
-            subprocess.run(
-                ["git", "ls-files", "--others", "--exclude-standard"],
-                cwd=repo_path,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-        )
-        logger.info("Uncommitted changes: %s", has_changes)
-        if has_changes and not messagebox.askyesno(
-            "Reset & Update",
-            f"This will reset the np_notebooks to origin/{branch} and update the Python "
-            "environment.\n\nContinue?",
-        ):
+        tk.Button(root, text="Launch", command=_launch, width=16).pack(pady=16)
+        root.bind("<Return>", lambda _: _launch())
+
+    def _start_reset_update() -> None:
+        proc = _reset_np_notebooks(branch)
+        if proc is None:
+            _build_widgets()
             return
-        logger.info("Terminating Jupyterlab processes to avoid file locks during reset")
-        kill_jupyter_processes()  # so files aren't locked during reset
-        logger.info("Resetting np_notebooks to origin/%s", branch)
-        cmds = (
-            "git fetch origin"
-            f" && git checkout -fB {branch} origin/{branch}"
-            " && git clean -fd"  # remove untracked files and directories
-            " && uv sync --python 3.11"
-        )
-        subprocess.Popen(
-            ["cmd", "/c", cmds],
-            cwd=repo_path,
-            creationflags=(
-                subprocess.CREATE_NEW_CONSOLE if sys.platform.startswith("win") else 0
-            ),
-        )
 
-    tk.Button(root, text="Launch", command=_launch, width=16).pack(pady=16)
-    root.bind("<Return>", lambda _: _launch())
-    root.after(0, _reset_update)
+        def _poll() -> None:
+            if proc.poll() is None:
+                root.after(500, _poll)
+            else:
+                logger.info("Reset & update complete (exit code %s)", proc.returncode)
+                _build_widgets()
+
+        _poll()
+
+    root.after(0, _start_reset_update)
     root.mainloop()
 
 
